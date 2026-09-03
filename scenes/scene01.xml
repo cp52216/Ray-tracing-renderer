@@ -1,0 +1,48 @@
+<Scene>
+    <!-- 相机：所有参数均为世界空间，Fov 单位为角度 -->
+    <Camera>
+        <Position>0, 0, 0</Position>
+        <Target>0, 0, 1</Target>
+        <Up>0, 1, 0</Up>
+        <NearZ>0.1</NearZ>
+        <FarZ>1000</FarZ>
+        <Fov>60</Fov>
+    </Camera>
+
+    <SceneObjects>
+        <!-- 矩形：两个三角形拼成，整体缩放 2（与之前硬编码场景一致） -->
+        <SceneObject>
+            <Transform>
+                <Position>0, 0, 5</Position>
+                <Rotation>0, 0, 0</Rotation>
+                <Scale>2</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                    <Vertex>-1, 1, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+
+        <!-- 球体：位于矩形前方的测试物体（验证多物体遮挡） -->
+        <SceneObject>
+            <Transform>
+                <Position>0, 0, 2</Position>
+                <Rotation>0, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Sphere>
+                    <Radius>0.5</Radius>
+                </Sphere>
+            </Primitives>
+        </SceneObject>
+    </SceneObjects>
+</Scene>

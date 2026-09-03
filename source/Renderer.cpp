@@ -1,46 +1,78 @@
 ﻿#include "Renderer.h"
 #include "Common.h"
 #include "MiniFB.h"
+#include "Triangle.h"
+#include "Sphere.h"
 #include <cmath>
 #include <chrono>
 #include <glm/gtc/random.hpp>
 
-Renderer::Renderer(int w, int h, int samplePerPixel)
+Renderer::Renderer(int w, int h, int samplePerPixel, const char* filepath)
     : mViewportWidth(w)
     , mViewportHeight(h)
+    , SamplePerPixel(samplePerPixel)
 {
-    SamplePerPixel = samplePerPixel; // 屏幕上每个像素的采样次数 (SPP)
+    mCurrentPixelIndex.store(0);
 
-    mCamera.Initialize(
-        Vector3f(0.0f, 0.0f, 0.0f),    // 相机位置
-        Vector3f(0.0f, 0.0f, 1.0f),    // 目标位置
-        Vector3f(0.0f, 1.0f, 0.0f),    // 上向量
-        glm::radians(60.0f),           // FOV
-        0.1f,                          // 近裁剪面
-        1000.0f,                       // 远裁剪面
-        w, h);                         // 视口宽高
+    // 从 XML 文件加载场景（相机与物体都定义在 XML 里）
+    mScene = Scene::LoadSceneFromXML(filepath, w, h);
 
-    // 测试对象：一个位于 (0,0,5) 的矩形，由两个三角形拼成
-    //   position/euler/scale 都是该矩形在世界坐标系中的摆放属性
-    mTestSceneObject = new SceneObject(Vector3f(0, 0, 5), Vector3f(0, 0, 0), 2.0f);
+    // ---- 硬编码场景（已被 XML 场景描述取代，保留备查）----
+    //SamplePerPixel = samplePerPixel; // 屏幕上每个像素的采样次数 (SPP)
 
-    // CreatePrimitive 会自动 new 图元、传入 this 并挂到对象下
-    mTestSceneObject->CreatePrimitive<Triangle>(
-        Vector3f(-1.0f, -1.0f, 0.0f),
-        Vector3f( 1.0f, -1.0f, 0.0f),
-        Vector3f( 1.0f,  1.0f, 0.0f));
+    //// 创建场景（相机与所有场景对象都由 Scene 管理）
+    //mScene = new Scene();
 
-    mTestSceneObject->CreatePrimitive<Triangle>(
-        Vector3f(-1.0f, -1.0f, 0.0f),
-        Vector3f( 1.0f,  1.0f, 0.0f),
-        Vector3f(-1.0f,  1.0f, 0.0f));
+    //// 相机参数都是世界空间的，初始化后交给场景保管
+    //Camera camera;
+    //camera.Initialize(
+    //    Vector3f(0, 0, 0),            // 相机位置
+    //    Vector3f(0, 0, 1),            // 目标位置
+    //    Vector3f(0.0f, 1.0f, 0.0f),   // 上向量
+    //    glm::radians(60.0f),          // FOV
+    //    0.1f,                         // 近裁剪面
+    //    1000.0f,                      // 远裁剪面
+    //    w, h);                        // 视口宽高
+    //mScene->SetCamera(camera);
+
+    //// 给场景添加物体：
+    ////   规则：CreateSceneObject / CreatePrimitive 的每个实参都必须加注释，标明含义与所属坐标系
+    //SceneObject* pSceneObject = mScene->CreateSceneObject(
+    //    Vector3f(0, 0, 5),   // position：矩形中心位置（世界空间）
+    //    Vector3f(0, 0, 0),   // euler   ：无旋转（世界空间下的欧拉角，弧度）
+    //    2.0f);               // scale   ：整体放大 2 倍（对象空间）
+
+    //// 三角形 1（矩形右下半）：参数为三个顶点，均在对象空间（局部坐标，z=0 平面）
+    //pSceneObject->CreatePrimitive<Triangle>(
+    //    Vector3f(-1, -1, 0), // v0：顶点 0（对象空间）
+    //    Vector3f(1, -1, 0),  // v1：顶点 1（对象空间）
+    //    Vector3f(1, 1, 0));  // v2：顶点 2（对象空间）
+
+    //// 三角形 2（矩形左上半）：与三角形 1 共用对角线，拼成完整矩形
+    //pSceneObject->CreatePrimitive<Triangle>(
+    //    Vector3f(-1, -1, 0), // v0：顶点 0（对象空间）
+    //    Vector3f(1, 1, 0),   // v1：顶点 1（对象空间）
+    //    Vector3f(-1, 1, 0)); // v2：顶点 2（对象空间）
+
+    //// 球体：位于矩形前方的测试物体（验证多物体遮挡：球应挡住矩形中心）
+    //SceneObject* pSceneObject2 = mScene->CreateSceneObject(
+    //    Vector3f(0, 0, 2),   // position：球心位置（世界空间，在矩形 z=5 前方）
+    //    Vector3f(0, 0, 0),   // euler   ：无旋转（球体各向同性，世界空间下的欧拉角，弧度）
+    //    1.0f);               // scale   ：1（半径由 Sphere 构造参数表达，对象空间）
+    //pSceneObject2->CreatePrimitive<Sphere>(
+    //    0.5f);               // R：球体半径（对象空间）
+
+    //auto pSphere = new Sphere(Vector3f(-1.0f, -1.0f, 10), 1.0f);
+    //auto pDisk = new Disk(Vector3f(0, -2.0f, 5), Vector3f(glm::radians(0.0f), 0, 0), 1.0f);
+    //auto pTriangle = new Triangle(Vector3f(-1, 0, 0), Vector3f(0, 1, 0), Vector3f(1, 0, 0));
+    //MakeWorldTransform(Vector3f(0, 0, 5), Vector3f(0, glm::radians(45.0f), glm::radians(60.0f)), 2.0f);
 }
 
 Renderer::~Renderer()
 {
-    // SceneObject 析构时会释放其下挂接的所有图元
-    delete mTestSceneObject;
-    mTestSceneObject = nullptr;
+    // Scene 析构时先释放所有 SceneObject，SceneObject 再释放其下挂接的图元
+    if (mScene)
+        delete mScene;
 
     if (mBuffer)
     {
@@ -139,19 +171,26 @@ Color Renderer::RenderPixel(int x, int y)
 
 Color Renderer::RenderSubPixel(float x, float y)
 {
-    Ray ray = mCamera.GetRay(x, y); // 世界空间射线
+    Ray ray = mScene->GetCamera().GetRay(x, y); // 世界空间射线
     Intersection isect;
     Color color(0.0f, 0.0f, 0.0f);
 
-    // 与测试场景对象在世界空间下求最近交点：
-    // SceneObject::Intersect 内部已用 isect.t 收缩 ray.maxt，最终 isect 保存最近交点
-    bool bHit = false;
-    if (mTestSceneObject && mTestSceneObject->Intersect(ray, isect))
-    {
-        bHit = true;
-    }
-
-    if (bHit)
+    // 与场景在世界空间下求最近交点：
+    //   Scene::Intersect 内部用 isect.t 收缩 ray.maxt，返回最近命中的场景对象（供后续取材质着色）
+    //bool bHit = false;
+    //for (const auto& primitive : mPrimitives)
+    //{
+    //    if (primitive->Intersect(ray, isect))
+    //    {
+    //        ray.maxt = isect.t;
+    //        bHit = true;
+    //    }
+    //}
+    //if (bHit)
+    //{
+    //    color = isect.normal * 0.5f + 0.5f; // 将法线向量映射到[0, 1]范围内，作为颜色输出
+    //}
+    if (mScene->Intersect(ray, isect))
     {
         color = isect.normal * 0.5f + 0.5f; // 将法线向量映射到[0, 1]范围内，作为颜色输出
     }

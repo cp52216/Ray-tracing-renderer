@@ -1,12 +1,7 @@
 ﻿#pragma once
 
 #include "Common.h"
-#include "Camera.h"
-#include "Primitive.h"
-#include "SceneObject.h"
-#include "Sphere.h"
-#include "Disk.h"
-#include "Triangle.h"
+#include "Scene.h"
 
 #include <atomic>
 #include <thread>
@@ -16,11 +11,13 @@ class Renderer
 {
 public:
 
-    Renderer(int w = 800, int h = 600, int samplePerPixel = 10);
+    // filepath：场景 XML 路径（相对工作目录，如 "../scenes/scene01.xml"）
+    Renderer(int w, int h, int samplePerPixel, const char* filepath);
     virtual ~Renderer();
 
     void Run();
 
+private:
     // 返回像素 (x, y) 的颜色（线性 RGB，分量范围 0.0~1.0）
     //   (x, y) 是屏幕像素坐标，原点在左上角
     virtual Color RenderPixel(int x, int y);
@@ -31,7 +28,6 @@ public:
     // 渲染线程的入口函数，负责执行渲染循环
     void RunRenderThread();
 
-protected:
     int mViewportWidth  = 800;  // 视口宽度（像素）
     int mViewportHeight = 600;  // 视口高度（像素）
 
@@ -44,10 +40,6 @@ protected:
     // 渲染队列：原子递增的像素下标，多个渲染线程通过 fetch_add 抢占下一个像素
     std::atomic<int> mCurrentPixelIndex{0};
 
-    // 相机：Initialize 后可通过 GetRay(x, y) 生成光线
-    Camera mCamera;
-
-    // 当前测试用的单个场景对象（包含多个基本图元）
-    SceneObject* mTestSceneObject = nullptr;
-
+    // 场景：持有相机与所有场景对象（Scene 拥有它们的生命周期）
+    Scene* mScene = nullptr;
 };

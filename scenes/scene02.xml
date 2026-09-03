@@ -1,0 +1,146 @@
+<Scene>
+    <!-- 相机：从盒子外往里看（康奈尔盒） -->
+    <Camera>
+        <Position>0, 0.6, -2.58</Position>
+        <Target>0, 0.61, 3</Target>
+        <Up>0, 1, 0</Up>
+        <NearZ>0.1</NearZ>
+        <FarZ>1000</FarZ>
+        <Fov>45</Fov>
+    </Camera>
+
+    <SceneObjects>
+        <!-- left sphere -->
+        <SceneObject>
+            <Transform>
+                <Position>-0.4, 0.3, 0.3</Position>
+                <Rotation>0, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Sphere>
+                    <Radius>0.3</Radius>
+                </Sphere>
+            </Primitives>
+        </SceneObject>
+
+        <!-- right sphere -->
+        <SceneObject>
+            <Transform>
+                <Position>0.4, 0.3, -0.3</Position>
+                <Rotation>0, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Sphere>
+                    <Radius>0.3</Radius>
+                </Sphere>
+            </Primitives>
+        </SceneObject>
+
+        <!-- ground：单位四边形绕 X 轴转 -90° 放平（法线朝上） -->
+        <SceneObject>
+            <Transform>
+                <Position>0, 0, 0</Position>
+                <Rotation>-90, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                    <Vertex>-1, 1, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+
+        <!-- ceiling：绕 X 轴转 90°（法线朝下） -->
+        <SceneObject>
+            <Transform>
+                <Position>0, 1.5, 0</Position>
+                <Rotation>90, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -1, 0</Vertex>
+                    <Vertex>1, 1, 0</Vertex>
+                    <Vertex>-1, 1, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+
+        <!-- left wall：绕 Y 轴转 90°（法线朝 +X），墙面高度范围 [-0.75, 0.75] -->
+        <SceneObject>
+            <Transform>
+                <Position>-1, 0.75, 0</Position>
+                <Rotation>0, 90, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                    <Vertex>-1, 0.75, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+
+        <!-- right wall：绕 Y 轴转 -90°（法线朝 -X） -->
+        <SceneObject>
+            <Transform>
+                <Position>1, 0.75, 0</Position>
+                <Rotation>0, -90, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                    <Vertex>-1, 0.75, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+
+        <!-- back wall：绕 X 轴转 180°（法线朝 -Z，面向相机） -->
+        <SceneObject>
+            <Transform>
+                <Position>0, 0.75, 1</Position>
+                <Rotation>180, 0, 0</Rotation>
+                <Scale>1</Scale>
+            </Transform>
+            <Primitives>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                </Triangle>
+                <Triangle>
+                    <Vertex>-1, -0.75, 0</Vertex>
+                    <Vertex>1, 0.75, 0</Vertex>
+                    <Vertex>-1, 0.75, 0</Vertex>
+                </Triangle>
+            </Primitives>
+        </SceneObject>
+    </SceneObjects>
+</Scene>

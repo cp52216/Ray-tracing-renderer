@@ -15,6 +15,7 @@ description: FortuneRenderer 软件光栅化/光线追踪渲染器项目的模�
 | 渲染器框架 | `source/Renderer.h` / `source/Renderer.cpp` | [references/renderer-core.md](references/renderer-core.md) |
 | 相机与射线 | `source/Camera.h/.cpp`、`source/Ray.h` | [references/camera.md](references/camera.md) |
 | 几何求交 | `source/Primitive.h`（抽象基类）、`source/SceneObject.h`（变换容器）、`source/Sphere.h/.cpp`、`source/Disk.h/.cpp`、`source/Triangle.h/.cpp` | [references/geometry-primitive.md](references/geometry-primitive.md)、[references/geometry-sphere.md](references/geometry-sphere.md)、[references/geometry-disk.md](references/geometry-disk.md)、[references/geometry-triangle.md](references/geometry-triangle.md) |
+| 场景 | `source/Scene.h/.cpp` | [references/scene.md](references/scene.md) |
 | 程序入口 | `source/main.cpp` | 见 renderer-core.md |
 
 ## 使用流程
@@ -36,11 +37,13 @@ description: FortuneRenderer 软件光栅化/光线追踪渲染器项目的模�
 ## 构建说明
 
 - CMake 项目，`build.bat` 一键生成（配置阶段），在 `build/` 下已有 VS 解决方案可直接编译。
-- 头文件包含路径：`minifb/include`、`glm`（见 CMakeLists.txt 的 `target_include_directories`）。
+- 头文件包含路径：`minifb/include`、`glm`、`tinyxml2`（见 CMakeLists.txt 的 `target_include_directories`）。
 - `file(GLOB_RECURSE ... CONFIGURE_DEPENDS)` 收集 `source/` 下所有 `.cpp/.h/.hpp`，新增文件会被自动纳入构建。
+- 场景描述：`scenes/*.xml`（tinyxml2 解析），运行时相对工作目录传给 Renderer 构造函数（VS 调试用 `../scenes/scene01.xml`）。
 
 ## 关键设计约定
 
+- **调用 `Scene::CreateSceneObject` / `SceneObject::CreatePrimitive` 时，每个实参必须加行尾注释**，标明含义与所属坐标系（见 references/scene.md 的编码规范）。
 - GLM 矩阵为列主序：构造函数每 4 个参数构成一列；下标访问 `m[col][row]`。
 - 像素缓冲 `mBuffer` 行优先存储，一维下标 `y * mViewportWidth + x`，打包格式 `0x00RRGGBB`。
 - `Color` 为线性 RGB（分量 0.0~1.0），由量化函数（round + clamp）转成 0~255 整数。

@@ -2,6 +2,29 @@
 
 > 每次为项目新增/修改功能后，在顶部按日期追加一条记录。
 
+## 2026-09-03（XML 场景加载：tinyxml2 + scene01/scene02）
+
+- **接入 tinyxml2**（第三方库）：`tinyxml2/` 目录（tinyxml2.h/.cpp，v11.0，Zlib 许可），CMakeLists 中 `target_sources` 把 tinyxml2.cpp 直接编进 FortuneRenderer 主工程（不生成独立 lib，避免 VS 多配置下 lib 输出路径找不到导致的 LNK1104）。
+- **Scene::LoadSceneFromXML**（Scene.h/cpp）：静态工厂，从 XML 加载相机（Position/Target/Up/NearZ/FarZ/Fov，Fov 角度制）+ SceneObjects（Transform 的 Position/Rotation 角度制/Scale + Primitives 的 Sphere/Disk/Triangle）；Rotation 在代码内转弧度；文件级 static 辅助 ParseVector3f/GetChildText/GetChildFloat。
+- **场景文件**（scenes/）：`scene01.xml`（相机 0,0,0→0,0,1 Fov60 + 矩形(0,0,5,scale2) + 球(0,0,2,R0.5)，与原硬编码场景一致）；`scene02.xml`（康奈尔盒：地面 -90°、顶棚 90°、左墙 0,90,0、右墙 0,-90,0、后墙 180°，两球 ±0.4,0.3,∓0.3 R0.3，相机 0,0.6,-2.58 Fov45）。
+- **Renderer/main 改造**：构造函数加 `filepath` 参数，`mScene = Scene::LoadSceneFromXML(filepath, w, h)`，旧硬编码场景注释保留；main.cpp 改为 `Renderer(1920, 1080, 100, "../scenes/scene01.xml")`。
+- **技能文档**：scene.md 新增 XML 加载章节；changelog 记录。
+
+## 2026-09-03（场景新增球体，验证多物体遮挡）
+
+- **场景添加第二个物体**（Renderer.cpp）：`pSceneObject2 = CreateSceneObject((0,0,2), 0, 1.0f)` + `CreatePrimitive<Sphere>(0.5f)`，球心在世界空间 (0,0,2)、位于矩形 (z=5) 前方，用于验证 `Scene::Intersect` 的最近交点/遮挡关系；调用处遵守逐参数注释规范。Renderer.cpp 补 include "Sphere.h"。
+
+## 2026-09-03（编码规范：场景调用必须逐参数注释）
+
+- **新增强制规则**：调用 `Scene::CreateSceneObject` / `SceneObject::CreatePrimitive` 时，每个实参必须加行尾注释（含义 + 坐标系），已写入 references/scene.md 编码规范章节与 SKILL.md 关键设计约定。
+- **代码落实**（Renderer.cpp）：测试矩形的 `CreateSceneObject` 与两个 `CreatePrimitive<Triangle>` 调用已改为逐参数注释（position/euler/scale 标注世界空间/对象空间，v0/v1/v2 标注对象空间）。
+
+## 2026-09-03（新增 Scene 场景类）
+
+- **新增 Scene**（Scene.h/cpp）：持有 `Camera` 与 `std::vector<SceneObject*> mSceneObjects`；`SetCamera/GetCamera` 读写相机；`CreateSceneObject(position, euler, float scale)` 工厂式创建并接管对象；`Intersect(ray, isect)` 遍历所有对象求**最近交点并返回命中的 SceneObject**（为后续按对象取材质铺路）；`~Scene()` 释放所有对象（所有权链：Renderer → Scene → SceneObject → Primitive）。
+- **Renderer 改用 Scene**（Renderer.h/cpp）：移除 `mCamera`/`mTestSceneObject` 成员，改为 `Scene* mScene`；构造中 `new Scene()` → 初始化相机（参数全为世界空间）→ `SetCamera` → `CreateSceneObject((0,0,5),0,2)` + 两个 `CreatePrimitive<Triangle>` 拼测试矩形；析构只 `delete mScene`；`RenderSubPixel` 改为 `mScene->GetCamera().GetRay(...)` + `mScene->Intersect(...)`（旧的 mPrimitives 遍历写法以注释保留）。RenderPixel/RenderSubPixel/RunRenderThread 移入 private。
+- **技能文档**：新增 references/scene.md；SKILL.md 模块地图、renderer-core.md 同步更新。
+
 ## 2026-09-02（CreatePrimitive 工厂模板 + MakeWorldTransform 恢复）
 
 - **SceneObject::CreatePrimitive**（SceneObject.h）：`template<typename T, typename... Args> T* CreatePrimitive(Args&&... args)`——内部 `new T(this, std::forward<Args>(args)...)` 自动把 `this` 作为 `SceneObject*` 传入图元构造，push 进 `mPrimitives` 并返回 `T*`；新增 `#include <utility>`。推荐替代手动 `new` + `AddPrimitive`。

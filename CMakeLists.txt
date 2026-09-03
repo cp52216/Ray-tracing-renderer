@@ -28,6 +28,11 @@ target_include_directories(FortuneRenderer PRIVATE
 add_subdirectory(minifb)
 
 target_link_libraries(FortuneRenderer PRIVATE minifb)
+
+# 添加 tinyxml2（第三方 XML 解析库，仅头文件+实现两个文件）：
+# 源码直接编进主工程，无需单独生成/链接 lib
+target_sources(FortuneRenderer PRIVATE "${CMAKE_SOURCE_DIR}/tinyxml2/tinyxml2.cpp")
+target_include_directories(FortuneRenderer PRIVATE "${CMAKE_SOURCE_DIR}/tinyxml2")
  
 if (WIN32)
 
