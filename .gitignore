@@ -1,0 +1,17 @@
+# 构建产物
+build/
+out/
+cmake-build-*/
+
+# IDE / 编辑器
+.vs/
+.vscode/
+.idea/
+*.user
+
+# CodeBuddy 工作区数据
+.codebuddy/
+
+# 系统文件
+Thumbs.db
+.DS_Store

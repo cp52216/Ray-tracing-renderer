@@ -1,0 +1,62 @@
+#include "Camera.h"
+
+void Camera::Initialize(const Vector3f& p, const Vector3f& target, const Vector3f& up,
+                        float fov, float n, float f, int W, int H)
+{
+    mPosition = p;
+
+    // 求观察矩阵：
+    //Vector3f l = glm::normalize(target - p); // 观察方向（从相机位置指向目标位置的向量）
+    //Vector3f r = glm::normalize(glm::cross(up, l));
+    //Vector3f u = glm::cross(l, r);
+
+    //Matrix4x4 viewMatrix = glm::transpose(Matrix4x4(
+    //    r.x, r.y, r.z, 0.0f,
+    //    u.x, u.y, u.z, 0.0f,
+    //    l.x, l.y, l.z, 0.0f,
+    //    0.0f, 0.0f, 0.0f, 1.0f
+    //)) * MakeTranslation(-p); // 注意矩阵乘法的顺序
+
+    // left-hand: 左手坐标系:
+    Matrix4x4 viewMatrix = glm::lookAtLH(p, target, up);
+
+    // 求投影矩阵：
+    Matrix4x4 projectionMatrix = glm::perspectiveFovLH_ZO(fov, (float)W, (float)H, n, f);
+
+    // 求视口矩阵：
+    // 把 NDC [-1,1] 映射到像素坐标 [0,W]x[0,H]，Y 翻转（像素 y 轴朝下）
+    Matrix4x4 viewportMatrix = Matrix4x4(
+        W / 2.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, -H / 2.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        W / 2.0f, H / 2.0f, 0.0f, 1.0f
+    );
+
+    // 合成 世界->像素 的变换矩阵（注意矩阵乘法的顺序）
+    Matrix4x4 combinedMatrix = viewportMatrix * projectionMatrix * viewMatrix;
+    Matrix4x4 invCombinedMatrix = glm::inverse(combinedMatrix);
+
+    mCombinedMatrix = combinedMatrix;
+    mInvCombinedMatrix = invCombinedMatrix;
+}
+
+Ray Camera::GetRay(int x, int y) const
+{
+    return GetRay((float)x, (float)y);
+}
+
+Ray Camera::GetRay(float x, float y) const
+{
+    Ray ray;
+    ray.o = mPosition;
+
+    // 屏幕像素坐标（z=0 表示近裁剪面）经逆矩阵转回世界空间
+    Vector4f p(x, y, 0.0f, 1.0f);
+    Vector4f worldPos = mInvCombinedMatrix * p;
+    worldPos /= worldPos.w; // 齐次坐标除以 w 分量，得到世界空间坐标
+
+    // 射线方向：从相机世界位置指向反投影后的世界坐标点
+    ray.d = glm::normalize(Vector3f(worldPos) - mPosition);
+
+    return ray;
+}
