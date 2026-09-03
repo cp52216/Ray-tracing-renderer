@@ -9,9 +9,6 @@ cmake-build-*/
 .idea/
 *.user
 
-# CodeBuddy 工作区数据
-.codebuddy/
-
 # 系统文件
 Thumbs.db
 .DS_Store
