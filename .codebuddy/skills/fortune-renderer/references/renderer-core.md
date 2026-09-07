@@ -25,7 +25,8 @@
   5. Present 循环：`mfb_update_ex` 提交 buffer → `mfb_wait_sync` 等垂直同步，`MFB_STATE_OK` 以外退出。
   6. 结束后 `free(mBuffer)`。
 - `virtual Color RenderPixel(int x, int y)`：像素着色入口，子类重写此函数实现不同画面。当前实现为 **SSAA 超采样抗锯齿**：`const int N = SamplePerPixel` 次循环，每次在 `(x,y)-(x+1,y+1)` 像素方格内用 `glm::linearRand(0,1)` 随机取亚像素点 `(px, py)`，调用 `RenderSubPixel(px, py)` 得颜色，`resultColor += color / N`，最终直接返回累加结果（即平均值）。需 include `<glm/gtc/random.hpp>`。
-- `virtual Color RenderSubPixel(float x, float y)`：单个亚像素采样点的着色：`mScene->GetCamera().GetRay(x, y)` 生成世界空间光线 → `mScene->Intersect(ray, isect)` 求最近交点（返回命中的 SceneObject，供后续取材质）；命中返回法线可视化颜色 `isect.normal * 0.5f + 0.5f`，否则黑色。旧的 mPrimitives 遍历写法以注释保留在函数体内。采样策略与 SSAA 平均仍解耦在 RenderPixel。
+- `virtual Color RenderSubPixel(float x, float y)`：单个亚像素采样点的着色：`mScene->GetCamera().GetRay(x, y)` 生成世界空间光线 → 交给 `GetIrradiance(ray)` 求着色。采样策略与 SSAA 平均仍解耦在 RenderPixel。
+- `Color GetIrradiance(const Ray& ray)`：给定世界空间光线，在场景中求最近交点（未命中返回黑色），命中后遍历 `mScene->GetLights()` 累加 Lambertian 漫反射贡献 `E += L * max(cosθ, 0)`，其中 `L = pLight->GetRadiance(isect.position, sourcePos)`、`cosθ = dot(isect.normal, d)`。**包含阴影光线追踪**：从交点向 `sourcePos` 投 `shadowRay`（`mint=1e-4` 避免自相交，`maxt=length(sourcePos - isect.position)` 只检测"光源和表面之间"），若与场景相交则 `continue` 跳过该光源。
 - `void RunRenderThread()`：渲染线程入口（消费者循环）。
   - `while (true)` 中 `int pixelIndex = mCurrentPixelIndex.fetch_add(1)` 原子认领像素；
   - `pixelIndex >= W*H` 时 break（一帧全部认领完毕）；

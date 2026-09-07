@@ -3,7 +3,7 @@
 
 int main() 
 {
-    Renderer renderer(800, 600, 10, "../scenes/scene02.xml");
+    Renderer renderer(800, 600, 2, "../scenes/scene03.xml");
     renderer.Run();
 
     return 0;

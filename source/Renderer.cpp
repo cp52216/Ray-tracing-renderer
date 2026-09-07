@@ -172,28 +172,49 @@ Color Renderer::RenderPixel(int x, int y)
 Color Renderer::RenderSubPixel(float x, float y)
 {
     Ray ray = mScene->GetCamera().GetRay(x, y); // 世界空间射线
-    Intersection isect;
-    Color color(0.0f, 0.0f, 0.0f);
+    Color color = GetIrradiance(ray);
+    return color;
+}
 
-    // 与场景在世界空间下求最近交点：
-    //   Scene::Intersect 内部用 isect.t 收缩 ray.maxt，返回最近命中的场景对象（供后续取材质着色）
-    //bool bHit = false;
-    //for (const auto& primitive : mPrimitives)
-    //{
-    //    if (primitive->Intersect(ray, isect))
-    //    {
-    //        ray.maxt = isect.t;
-    //        bHit = true;
-    //    }
-    //}
-    //if (bHit)
-    //{
-    //    color = isect.normal * 0.5f + 0.5f; // 将法线向量映射到[0, 1]范围内，作为颜色输出
-    //}
-    if (mScene->Intersect(ray, isect))
+// 给定一条世界空间光线，求它在场景中交点的入射辐射：
+//   1) 与场景求最近交点；未命中 → 背景黑色
+//   2) 命中后遍历所有光源做 Lambertian 漫反射累加（E(p) = Σ L * max(cosθ, 0)）
+//      暂不含阴影光线；cosθ 为世界空间下交点法线与指向光源的单位向量的夹角余弦
+Color Renderer::GetIrradiance(const Ray& ray)
+{
+    Intersection isect;
+    if (!mScene->Intersect(ray, isect))
     {
-        color = isect.normal * 0.5f + 0.5f; // 将法线向量映射到[0, 1]范围内，作为颜色输出
+        return Color(0.0f, 0.0f, 0.0f);
     }
 
-    return color;
+    Color E(0.0f, 0.0f, 0.0f); // E(p)：入射辐射（线性 RGB）
+    // E(p)
+    for (Light* pLight : mScene->GetLights())
+    {
+        // 取光源在交点处的入射辐射 L，以及光源在世界中位置 sourcePos
+        Vector3f sourcePos;
+        Color L = pLight->GetRadiance(isect.position, sourcePos);
+
+        // 求 shadowRay：从交点向光源方向投一条"阴影光线"，
+        //   mint=1e-3 避免起点与自身表面发生自相交；maxt=到光源的距离，只检测"光源和表面之间"的遮挡
+        Ray shadowRay;
+        shadowRay.o    = isect.position;
+        shadowRay.d    = glm::normalize(sourcePos - isect.position);
+        shadowRay.mint = 1e-3f;
+        shadowRay.maxt = glm::length(sourcePos - isect.position);
+
+        // 如果 shadowRay 与场景中其他物体相交，说明该点被遮挡，跳过该光源的贡献
+        Intersection shadow_isect;
+        if (mScene->Intersect(shadowRay, shadow_isect))
+            continue;
+
+        // cosθ = 法线·d（两者都在世界空间）
+        float cosTheta = glm::dot(isect.normal, shadowRay.d);
+
+        // Lambertian 漫反射：E += L * max(cosθ, 0)
+        E += L * glm::max(cosTheta, 0.0f);
+    }
+
+    return E;
 }

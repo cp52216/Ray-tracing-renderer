@@ -136,6 +136,57 @@ Scene* Scene::LoadSceneFromXML(const char* filepath, int W, int H)
         }
     }
 
+    // 解析 Lights
+    tinyxml2::XMLElement* pLightsElem = pRoot->FirstChildElement("Lights");
+    if (pLightsElem)
+    {
+        // DirectionalLight
+        for (tinyxml2::XMLElement* pElem = pLightsElem->FirstChildElement("DirectionalLight");
+             pElem != nullptr;
+             pElem = pElem->NextSiblingElement("DirectionalLight"))
+        {
+            Vector3f direction = ParseVector3f(GetChildText(pElem, "Direction"));
+            Color    radiance  = ParseVector3f(GetChildText(pElem, "Radiance"));
+            pScene->CreateLight<DirectionalLight>(
+                direction, // direction：光线方向（世界空间，将被归一化）
+                radiance); // radiance ：入射辐射强度（线性 RGB）
+        }
+
+        // PointLight
+        for (tinyxml2::XMLElement* pElem = pLightsElem->FirstChildElement("PointLight");
+             pElem != nullptr;
+             pElem = pElem->NextSiblingElement("PointLight"))
+        {
+            Vector3f position     = ParseVector3f(GetChildText(pElem, "Position"));
+            Color    intensity    = ParseVector3f(GetChildText(pElem, "Intensity"));
+            Vector3f attenuations = ParseVector3f(GetChildText(pElem, "Attenuations"));
+            pScene->CreateLight<PointLight>(
+                position,     // position    ：光源位置（世界空间）
+                intensity,    // intensity   ：光源强度（线性 RGB）
+                attenuations);// attenuations：衰减系数 (A, B, C)
+        }
+
+        // SpotLight（角度在 XML 里以"度"为单位，这里转成弧度后传入）
+        for (tinyxml2::XMLElement* pElem = pLightsElem->FirstChildElement("SpotLight");
+             pElem != nullptr;
+             pElem = pElem->NextSiblingElement("SpotLight"))
+        {
+            Vector3f position     = ParseVector3f(GetChildText(pElem, "Position"));
+            Vector3f direction    = ParseVector3f(GetChildText(pElem, "Direction"));
+            Color    intensity    = ParseVector3f(GetChildText(pElem, "Intensity"));
+            float    innerAngle   = glm::radians(GetChildFloat(pElem, "InnerAngle", 0.0f));
+            float    outerAngle   = glm::radians(GetChildFloat(pElem, "OuterAngle", 0.0f));
+            Vector3f attenuations = ParseVector3f(GetChildText(pElem, "Attenuations"));
+            pScene->CreateLight<SpotLight>(
+                position,     // position    ：光源位置（世界空间）
+                direction,    // direction   ：聚光朝向（世界空间，将被归一化）
+                intensity,    // intensity   ：光源强度（线性 RGB）
+                innerAngle,   // innerAngle  ：内锥半角（弧度，alpha）
+                outerAngle,   // outerAngle  ：外锥半角（弧度，beta，alpha < beta）
+                attenuations);// attenuations：衰减系数 (A, B, C)
+        }
+    }
+
     return pScene;
 }
 
@@ -147,9 +198,14 @@ SceneObject* Scene::CreateSceneObject(const Vector3f& position, const Vector3f& 
     return pSceneObject;
 }
 
-// 析构：释放所有场景对象（SceneObject 析构会继续释放其下挂接的图元）
+// 析构：释放所有光源与场景对象
 Scene::~Scene()
 {
+    for (Light* light : mLights)
+    {
+        delete light;
+    }
+
     for (SceneObject* pSceneObject : mSceneObjects)
     {
         delete pSceneObject;

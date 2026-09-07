@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Scene.h"
+#include "Ray.h"
 
 #include <atomic>
 #include <thread>
@@ -22,8 +23,13 @@ private:
     //   (x, y) 是屏幕像素坐标，原点在左上角
     virtual Color RenderPixel(int x, int y);
 
-    // 返回亚像素坐标 (x, y) 的颜色：生成世界空间光线、与场景求交并着色
+    // 返回亚像素坐标 (x, y) 的颜色：生成世界空间光线并交给 GetIrradiance 求着色
     virtual Color RenderSubPixel(float x, float y);
+
+    // 给定一条世界空间光线，求它在场景中交点的入射辐射：
+    //   - 背景（未命中）返回黑色
+    //   - 命中则累加所有光源的 Lambertian 漫反射贡献（暂不含阴影）
+    Color GetIrradiance(const Ray& ray);
 
     // 渲染线程的入口函数，负责执行渲染循环
     void RunRenderThread();

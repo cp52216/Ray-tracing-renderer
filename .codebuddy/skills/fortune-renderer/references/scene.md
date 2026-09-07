@@ -18,7 +18,9 @@
 | `const Camera& GetCamera() const` | 取相机，渲染端用它生成世界空间光线 |
 | `SceneObject* CreateSceneObject(position, euler, scale)` | `new SceneObject(...)` 后 push 进 `mSceneObjects` 并返回指针；`position/euler/scale` 相对世界坐标系 |
 | `SceneObject* Intersect(Ray ray, Intersection& isect) const` | 世界空间下遍历所有对象求最近交点；命中后 `ray.maxt = isect.t` 收缩区间，**返回最近命中的 SceneObject**（供后续取材质着色），未命中返回 `nullptr` |
-| `~Scene()` | 遍历 `delete` 所有 SceneObject（SceneObject 析构再释放其图元） |
+| `template<typename T, typename... Args> T* CreateLight(Args&&... args)` | 工厂式创建光源：内部 `new T(args...)` + push 进 `mLights` 并返回 `T*`（所有权归本 Scene） |
+| `const std::vector<Light*>& GetLights() const` | 取所有光源（供渲染端做直接光照/阴影追踪） |
+| `~Scene()` | 释放所有光源与 SceneObject |
 
 ## XML 场景加载（LoadSceneFromXML）
 

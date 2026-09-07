@@ -2,6 +2,31 @@
 
 > 每次为项目新增/修改功能后，在顶部按日期追加一条记录。
 
+## 2026-09-04（scene03 光源调参 + shadow_isect 独立化）
+
+- **scene03.xml 光源更新**（scenes/）：康奈尔盒几何不变，三种光源参数调整：
+  - `DirectionalLight` Direction `0,-1,0` → `1, -2, 0.4`（斜射），**已注释屏蔽**
+  - `PointLight` Position `0,1.4,0` → `0, 1, 0`（盒内中央稍上方），保留启用
+  - `SpotLight` Position `0,1.4,0`/Direction `0,-1,0` → Position `(-0.8, 0.9, 0)`、Direction `(2, -1, 0)`（左上往右下斜射），Inner/Outer 改为 `10°/60°`，**已注释屏蔽**
+  - 场景当前实际生效光源：仅 `PointLight`。
+- **GetIrradiance 阴影射线独立化**（Renderer.cpp）：shadow ray 改用独立 `Intersection shadow_isect`（不再复用 `isect`），`mint` 从 `1e-4` 提到 `1e-3` 增强自相交鲁棒性。
+
+## 2026-09-04（直接光照：Renderer::GetIrradiance）
+
+- **Renderer 拆出 GetIrradiance**（Renderer.h/.cpp）：新增私有 `Color GetIrradiance(const Ray& ray)`，对场景求最近交点（未命中返回黑色），命中后遍历 `mScene->GetLights()` 累加 Lambertian 漫反射 `E += L * max(cosθ, 0)`；`RenderSubPixel` 简化为"生成世界空间光线 → 调 GetIrradiance"。Renderer.h 显式 `#include "Ray.h"`。**当前未做阴影光线追踪**，下一步可加 shadow ray。
+
+## 2026-09-04（阴影光线追踪：GetIrradiance 加 shadowRay）
+
+- **加 shadow ray**（Renderer.cpp GetIrradiance）：从交点 `isect.position` 朝 `sourcePos` 投一条阴影光线（`mint=1e-4` 防自相交，`maxt=length(sourcePos - isect.position)` 只检测光源与表面之间的遮挡），与场景相交则 `continue` 跳过该光源的贡献。
+- **技能文档**：renderer-core.md GetIrradiance 描述更新，changelog 同步。
+
+## 2026-09-04（Light 光源模块 + scene03 康奈尔盒带光）
+
+- **新增 Light 模块**（Light.h/.cpp）：抽象基类 `Light`（`GetRadiance(p, sourcePos)`）；派生 `DirectionalLight`（direction+radiance）、`PointLight`（position+intensity+attenuations (A,B,C)）、`SpotLight`（+ direction + 内外锥角；角度用弧度，构造时存 cos 方便运行时用）。所有光源参数都在世界空间，attenuation = `1 / (C + B*R + A*R²)`，加了 `1e-4` 防 R=0。
+- **Scene 加入光源管理**（Scene.h/.cpp）：`CreateLight<T>(args...)` 工厂模板 + `mLights` + `GetLights()`；`~Scene()` 释放光源与对象。`LoadSceneFromXML` 扩展解析 `<Lights>` 节点（DirectionalLight/PointLight/SpotLight），SpotLight 的 InnerAngle/OuterAngle 自动从度转弧度；CreateLight 调用处遵守逐参数注释规范。
+- **场景文件**：`scenes/scene03.xml` = scene02（康奈尔盒）+ 三种光源（顶向下 DirectionalLight、中心 PointLight (0,1.4,0)、同位置 SpotLight 15°/30° 锥角），都加二次衰减 (1,0,0)。
+- **技能文档**：新增 `references/light.md`；SKILL.md 模块地图、scene.md、`changelog.md` 同步更新。
+
 ## 2026-09-03（XML 场景加载：tinyxml2 + scene01/scene02）
 
 - **接入 tinyxml2**（第三方库）：`tinyxml2/` 目录（tinyxml2.h/.cpp，v11.0，Zlib 许可），CMakeLists 中 `target_sources` 把 tinyxml2.cpp 直接编进 FortuneRenderer 主工程（不生成独立 lib，避免 VS 多配置下 lib 输出路径找不到导致的 LNK1104）。
