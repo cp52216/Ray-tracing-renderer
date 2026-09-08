@@ -14,6 +14,10 @@ using Matrix3x3 = glm::mat3;
 using Matrix4x4 = glm::mat4;
 using Color     = glm::vec3;
 
+// 数学常量：PI 与 1/PI（BRDF、面积公式等常用）
+inline const float PI     = glm::pi<float>();
+inline const float INV_PI = 1.0f / PI;
+
 //构造局部→世界的平移矩阵（GLM 列主序：每 4 个参数构成一列）
 //  t：对象在世界坐标系中的平移量（世界空间）
 //  列0=(1,0,0,0) 列1=(0,1,0,0) 列2=(0,0,1,0) 列3=(t.x,t.y,t.z,1)

@@ -172,14 +172,73 @@ Color Renderer::RenderPixel(int x, int y)
 Color Renderer::RenderSubPixel(float x, float y)
 {
     Ray ray = mScene->GetCamera().GetRay(x, y); // 世界空间射线
-    Color color = GetIrradiance(ray);
+    Color color = GetRadiance(ray);
     return color;
 }
 
-// 给定一条世界空间光线，求它在场景中交点的入射辐射：
+// 给定一条世界空间光线，求它沿出射方向返回的辐射 Lo（渲染方程）：
 //   1) 与场景求最近交点；未命中 → 背景黑色
-//   2) 命中后遍历所有光源做 Lambertian 漫反射累加（E(p) = Σ L * max(cosθ, 0)）
-//      暂不含阴影光线；cosθ 为世界空间下交点法线与指向光源的单位向量的夹角余弦
+//   2) 命中后在命中点处建立局部坐标系（z 轴 = 法线），把 wo/wi 转到局部坐标系后
+//      调材质的 BRDF，按 Lo = Σ BRDF * L_i * max(cosθ, 0) 累加
+//   3) 每盏灯先做 shadow ray 检测是否被遮挡，遮挡则 continue
+Color Renderer::GetRadiance(const Ray& ray)
+{
+    Intersection isect;
+    SceneObject* pSceneObject = mScene->Intersect(ray, isect);
+    if (pSceneObject == nullptr)
+    {
+        return Color(0, 0, 0);
+    }
+
+    // 命中点的材质 BRDF（若无材质则视为全白 Lambert）
+    Material* pMaterial = pSceneObject->GetMaterial();
+    Color Lo(0, 0, 0);
+
+    // 以命中点法线为 z 轴建立局部坐标系（u, v = w），
+    // localToWorld 的三列分别为 (u, v, w)；worldToLocal = transpose(localToWorld)
+    Matrix3x3 localToWorld = MakeCoordinateSystem(isect.normal);
+    Matrix3x3 worldToLocal = glm::transpose(localToWorld);
+
+    // 出射方向：相机射线的反方向，转换到局部坐标系
+    Vector3f wo = worldToLocal * (-ray.d); // 出射方向，转换到局部坐标系
+
+    for (Light* pLight : mScene->GetLights())
+    {
+        // 取光源在交点处的入射辐射 L，以及光源在世界中位置 sourcePos
+        Vector3f sourcePos;
+        Color L = pLight->GetRadiance(isect.position, sourcePos);
+
+        // 求 shadowRay
+        Ray shadowRay;
+        shadowRay.o    = isect.position;
+        shadowRay.d    = glm::normalize(sourcePos - isect.position);
+        shadowRay.mint = 1e-3f;
+        shadowRay.maxt = glm::length(sourcePos - isect.position);
+
+        // 如果 shadowRay 与场景中的物体相交，说明该点被遮挡
+        Intersection shadow_isect;
+        if (mScene->Intersect(shadowRay, shadow_isect))
+            continue;
+
+        // 入射方向：交点指向光源的单位向量，转换到局部坐标系
+        Vector3f wi = worldToLocal * shadowRay.d; // 入射方向，转换到局部坐标系
+        // cosθ 在世界空间下计算（normal·shadowRay.d）；由于 normal 已是 localToWorld 的 z 轴，
+        // 这里等价于 wi.z，但保留世界空间写法便于阅读
+        float cosTheta = glm::dot(isect.normal, shadowRay.d);
+
+        // 调用材质 BRDF（在局部坐标系下评估）
+        Color brdf = pMaterial->BRDF(wo, wi);
+        Lo += brdf * L * glm::max(cosTheta, 0.0f);
+    }
+
+    return Lo;
+}
+
+// 给定一条世界空间光线，求它在场景中交点的入射辐照度 E(p)（不含材质反射）：
+//   1) 与场景求最近交点；未命中 → 背景黑色
+//   2) 命中后遍历所有光源累加 E(p) = Σ L * max(cosθ, 0)
+//   3) 每盏灯先做 shadow ray 检测是否被遮挡，遮挡则 continue
+//   与 GetRadiance 的区别：不乘材质 BRDF，得到的是"到达该点的光"而非"反射出去的光"
 Color Renderer::GetIrradiance(const Ray& ray)
 {
     Intersection isect;
@@ -188,7 +247,7 @@ Color Renderer::GetIrradiance(const Ray& ray)
         return Color(0.0f, 0.0f, 0.0f);
     }
 
-    Color E(0.0f, 0.0f, 0.0f); // E(p)：入射辐射（线性 RGB）
+    Color E(0.0f, 0.0f, 0.0f); // E(p)：入射辐照度（线性 RGB）
     // E(p)
     for (Light* pLight : mScene->GetLights())
     {

@@ -2,8 +2,11 @@
 
 #include "SceneObject.h"
 #include "Light.h"
+#include "Material.h"
 #include "Camera.h"
 #include <vector>
+#include <map>
+#include <string>
 #include <utility>
 
 // 场景：管理 相机 + 所有场景对象（SceneObject） + 所有光源（Light）
@@ -46,6 +49,26 @@ public:
     // 获取所有光源（供渲染端做直接光照 / 阴影计算）
     const std::vector<Light*>& GetLights() const { return mLights; }
 
+    // 创建材质并以名字注册到场景（方便 SceneObject 通过名字引用）：
+    //   T     ：材质类型（LambertMaterial 等）
+    //   name  ：材质名（唯一标识，后续通过 GetMaterial 查找）
+    //   args  ：材质构造参数
+    //   返回值：新创建的材质指针（所有权归本 Scene）
+    template<typename T, typename... Args>
+    T* CreateMaterial(const std::string& name, Args&&... args)
+    {
+        T* material = new T(std::forward<Args>(args)...);
+        mMaterials.insert({ name, material });
+        return material;
+    }
+
+    // 按名字查找材质（XML 加载时用，SceneObject 通过 <Material>name</Material> 引用）
+    Material* GetMaterial(const std::string& name) const
+    {
+        auto it = mMaterials.find(name);
+        return (it != mMaterials.end()) ? it->second : nullptr;
+    }
+
     // 与场景中所有对象求最近交点（ray/isect 均在世界空间）：
     //   命中后用 isect.t 收缩 ray.maxt，返回命中的场景对象（供后续着色/取材质），未命中返回 nullptr
     SceneObject* Intersect(Ray ray, Intersection& isect) const;
@@ -57,4 +80,5 @@ private:
     Camera mCamera;                         // 场景相机（世界空间）
     std::vector<SceneObject*> mSceneObjects; // 场景中所有对象（Scene 拥有）
     std::vector<Light*>       mLights;      // 场景中所有光源（Scene 拥有）
+    std::map<std::string, Material*> mMaterials; // 材质名 → 材质对象的映射（Scene 拥有）
 };

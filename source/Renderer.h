@@ -23,12 +23,19 @@ private:
     //   (x, y) 是屏幕像素坐标，原点在左上角
     virtual Color RenderPixel(int x, int y);
 
-    // 返回亚像素坐标 (x, y) 的颜色：生成世界空间光线并交给 GetIrradiance 求着色
+    // 返回亚像素坐标 (x, y) 的颜色：生成世界空间光线并交给 GetRadiance 求着色
     virtual Color RenderSubPixel(float x, float y);
 
-    // 给定一条世界空间光线，求它在场景中交点的入射辐射：
+    // 给定一条世界空间光线，求它沿出射方向返回的辐射 Lo（渲染方程）：
     //   - 背景（未命中）返回黑色
-    //   - 命中则累加所有光源的 Lambertian 漫反射贡献（暂不含阴影）
+    //   - 命中则在命中点处建局部坐标系，把 wo/wi 转到局部后调用材质的 BRDF，
+    //     按 Lo = Σ BRDF * L_i * max(cosθ, 0) 累加，并带阴影光线追踪
+    Color GetRadiance(const Ray& ray);
+
+    // 给定一条世界空间光线，求它在场景中交点的入射辐照度 E(p)（不含材质反射）：
+    //   - 背景（未命中）返回黑色
+    //   - 命中后遍历所有光源累加 E += L * max(cosθ, 0)，带阴影光线追踪
+    //   （不乘 BRDF，是"到达该点的光"，与 GetRadiance 的"从该点反射出去的光"相对）
     Color GetIrradiance(const Ray& ray);
 
     // 渲染线程的入口函数，负责执行渲染循环

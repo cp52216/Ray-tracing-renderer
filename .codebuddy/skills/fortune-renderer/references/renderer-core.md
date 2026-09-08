@@ -26,7 +26,15 @@
   6. 结束后 `free(mBuffer)`。
 - `virtual Color RenderPixel(int x, int y)`：像素着色入口，子类重写此函数实现不同画面。当前实现为 **SSAA 超采样抗锯齿**：`const int N = SamplePerPixel` 次循环，每次在 `(x,y)-(x+1,y+1)` 像素方格内用 `glm::linearRand(0,1)` 随机取亚像素点 `(px, py)`，调用 `RenderSubPixel(px, py)` 得颜色，`resultColor += color / N`，最终直接返回累加结果（即平均值）。需 include `<glm/gtc/random.hpp>`。
 - `virtual Color RenderSubPixel(float x, float y)`：单个亚像素采样点的着色：`mScene->GetCamera().GetRay(x, y)` 生成世界空间光线 → 交给 `GetIrradiance(ray)` 求着色。采样策略与 SSAA 平均仍解耦在 RenderPixel。
-- `Color GetIrradiance(const Ray& ray)`：给定世界空间光线，在场景中求最近交点（未命中返回黑色），命中后遍历 `mScene->GetLights()` 累加 Lambertian 漫反射贡献 `E += L * max(cosθ, 0)`，其中 `L = pLight->GetRadiance(isect.position, sourcePos)`、`cosθ = dot(isect.normal, d)`。**包含阴影光线追踪**：从交点向 `sourcePos` 投 `shadowRay`（`mint=1e-4` 避免自相交，`maxt=length(sourcePos - isect.position)` 只检测"光源和表面之间"），若与场景相交则 `continue` 跳过该光源。
+- `Color GetRadiance(const Ray& ray)`：给定世界空间光线，调用 `mScene->Intersect(ray, isect)` 求最近交点（未命中返回黑色）。命中后：
+  - 取命中 SceneObject 的材质 `Material* pMaterial`；
+  - 以命中点法线为 z 轴构建局部坐标系：`localToWorld = MakeCoordinateSystem(isect.normal)`、`worldToLocal = transpose(localToWorld)`；
+  - 出射方向 `wo = worldToLocal * (-ray.d)`（局部坐标）；
+  - 遍历 `mScene->GetLights()`，对每盏灯先投 shadow ray（`mint=1e-3` 避免自相交，`maxt=length(sourcePos - isect.position)`），被遮挡则 `continue`；未遮挡时 `wi = worldToLocal * shadowRay.d`、`cosθ = dot(isect.normal, shadowRay.d)`；
+  - 按渲染方程累加 `Lo += pMaterial->BRDF(wo, wi) * L * max(cosθ, 0)`；
+  - 返回 `Lo`（出射辐射，线性 RGB）。
+- `Color GetIrradiance(const Ray& ray)`：**入射辐照度版**——同样求交 + shadow ray，但**不乘 BRDF**，按 `E = Σ L * max(cosθ, 0)` 累加，返回"到达该点的光"。与 GetRadiance 相对（后者是"反射出去的光"）。当前 `RenderSubPixel` 只调 GetRadiance；GetIrradiance 保留作调试/对比用途。
+- 调用方：`RenderSubPixel` 调 `GetRadiance(ray)` 拿到出射辐射。
 - `void RunRenderThread()`：渲染线程入口（消费者循环）。
   - `while (true)` 中 `int pixelIndex = mCurrentPixelIndex.fetch_add(1)` 原子认领像素；
   - `pixelIndex >= W*H` 时 break（一帧全部认领完毕）；

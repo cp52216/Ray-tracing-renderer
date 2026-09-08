@@ -20,22 +20,29 @@
 | `SceneObject* Intersect(Ray ray, Intersection& isect) const` | 世界空间下遍历所有对象求最近交点；命中后 `ray.maxt = isect.t` 收缩区间，**返回最近命中的 SceneObject**（供后续取材质着色），未命中返回 `nullptr` |
 | `template<typename T, typename... Args> T* CreateLight(Args&&... args)` | 工厂式创建光源：内部 `new T(args...)` + push 进 `mLights` 并返回 `T*`（所有权归本 Scene） |
 | `const std::vector<Light*>& GetLights() const` | 取所有光源（供渲染端做直接光照/阴影追踪） |
-| `~Scene()` | 释放所有光源与 SceneObject |
+| `template<typename T, typename... Args> T* CreateMaterial(const std::string& name, Args&&... args)` | 工厂式创建材质：以 `name` 为 key 放入 `mMaterials` 映射，返回 `T*`（所有权归本 Scene） |
+| `Material* GetMaterial(const std::string& name) const` | 按名字查找材质（XML 加载时用，SceneObject 通过 `<Material>name</Material>` 引用） |
+| `~Scene()` | 释放所有材质、光源与 SceneObject |
 
 ## XML 场景加载（LoadSceneFromXML）
 
+实现已从 `Scene.cpp` 拆到 **`SceneLoader.cpp`**（XML 解析逻辑、静态辅助函数都在这）。`Scene.cpp` 只保留 C++ 端：CreateSceneObject/Intersect/析构。
+
 依赖第三方库 **tinyxml2**（`tinyxml2/` 目录，仅 `tinyxml2.h/.cpp` 两个文件，Zlib 许可），`tinyxml2.cpp` 通过 `target_sources` 直接编进 FortuneRenderer 主工程，不生成独立 lib。
 
-解析流程（Scene.cpp）：
+解析流程（SceneLoader.cpp）：
 1. `doc.LoadFile(filepath)` 失败 → 返回 `nullptr`；取 `<Scene>` 根元素。
 2. `<Camera>`：`Position/Target/Up`（"x, y, z" 文本）、`NearZ/FarZ/Fov`（Fov 为**角度**，代码内转弧度）→ `camera.Initialize(..., W, H)` 后 `SetCamera`。
-3. `<SceneObjects>` 下遍历 `<SceneObject>`：
+3. **`<Materials>`**（必须早于 `<SceneObjects>`）：遍历 `<Material>`，按 `<Type>` 分发到 `CreateMaterial<LambertMaterial>(name, albedo)`；`mMaterials` 用 `name` 做 key。
+4. `<SceneObjects>` 下遍历 `<SceneObject>`：
    - `<Transform>`：`Position/Rotation/Scale`（Rotation 为**角度**，代码内 `glm::radians` 转弧度）→ `CreateSceneObject`；
+   - `<Material>`：用 `pScene->GetMaterial(name)` 查表后 `SetMaterial`；
    - `<Primitives>`：按标签依次解析 `Sphere(Radius)`、`Disk(Radius)`、`Triangle(Vertex×3 顺序读取)` → `CreatePrimitive<T>`。
+5. `<Lights>`：Directional/Point/SpotLight 解析（SpotLight 角度从度转弧度）→ `CreateLight<T>`。
 
-辅助函数（Scene.cpp 文件级 static）：`ParseVector3f("x, y, z")`、`GetChildText(elem, name)`、`GetChildFloat(elem, name, default)`。
+辅助函数（SceneLoader.cpp 文件级 static）：`ParseVector3f("x, y, z")`、`GetChildText(elem, name)`、`GetChildFloat(elem, name, default)`。
 
-场景文件：`scenes/scene01.xml`（矩形+球，与原硬编码场景一致）、`scenes/scene02.xml`（康奈尔盒：地面/顶棚/左右墙/后墙 + 两球）。运行时路径相对工作目录，VS 调试传 `../scenes/scene01.xml`。
+场景文件：`scenes/scene01.xml`（矩形+球）、`scenes/scene02.xml`（康奈尔盒无光）、`scenes/scene03.xml`（康奈尔盒 + 三种光）、`scenes/scene04.xml`（康奈尔盒 + Lambert 材质 + 灯）。运行时路径相对工作目录，VS 调试传 `../scenes/scene04.xml`。
 
 ## 所有权链
 

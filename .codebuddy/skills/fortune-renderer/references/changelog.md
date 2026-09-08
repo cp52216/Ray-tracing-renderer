@@ -2,13 +2,32 @@
 
 > 每次为项目新增/修改功能后，在顶部按日期追加一条记录。
 
-## 2026-09-04（scene03 光源调参 + shadow_isect 独立化）
+## 2026-09-08（恢复 GetIrradiance 与 GetRadiance 并存）
 
-- **scene03.xml 光源更新**（scenes/）：康奈尔盒几何不变，三种光源参数调整：
-  - `DirectionalLight` Direction `0,-1,0` → `1, -2, 0.4`（斜射），**已注释屏蔽**
-  - `PointLight` Position `0,1.4,0` → `0, 1, 0`（盒内中央稍上方），保留启用
-  - `SpotLight` Position `0,1.4,0`/Direction `0,-1,0` → Position `(-0.8, 0.9, 0)`、Direction `(2, -1, 0)`（左上往右下斜射），Inner/Outer 改为 `10°/60°`，**已注释屏蔽**
-  - 场景当前实际生效光源：仅 `PointLight`。
+- **恢复 `Color GetIrradiance(const Ray& ray)`**（Renderer.h/.cpp，从 git be223b2 找回实现）：求交 + shadow ray + `E = Σ L * max(cosθ, 0)`，**不乘 BRDF**，返回"到达该点的入射辐照度"；与 `GetRadiance`（乘 BRDF 的出射辐射 Lo）并存。`RenderSubPixel` 仍调 GetRadiance，GetIrradiance 保留作调试/对比（想看纯光照分布不带材质颜色时把调用切过去即可）。
+
+## 2026-09-08（GetIrradiance → GetRadiance：局部坐标系 + BRDF）
+
+- **Renderer::GetIrradiance 重构为 GetRadiance**（Renderer.h/.cpp）：按渲染方程 `Lo = Σ BRDF * L_i * max(cosθ, 0)` 返回出射辐射（不再是入射辐照 E）。
+  - 命中后用 `MakeCoordinateSystem(isect.normal)` + `transpose` 建立局部坐标系（z = 法线）；
+  - `wo = worldToLocal * (-ray.d)`、`wi = worldToLocal * shadowRay.d`（BRDF 在局部系下评估）；
+  - 移除原先的"全白 Lambert fallback"；改为空材质时退到 `Color(INV_PI)` 的临时 BRDF，调一次 `pMaterial->BRDF(wo, wi)`；
+  - `RenderSubPixel` 改为调 `GetRadiance(ray)`，返回值作为亚像素颜色。
+- **技能文档**：renderer-core.md、changelog.md 同步。
+
+## 2026-09-08（材质模块 + 渲染方程 BRDF + 解析器拆分）
+
+- **新增 Material 模块**（Material.h）：抽象基类 `Material::BRDF(wo, wi)`；派生 `LambertMaterial(albedo)`，`BRDF = albedo * INV_PI`。
+- **Common.h 加入 PI/INV_PI**：作为 Lambert BRDF 分母常量。
+- **SceneObject 支持材质**：新增 `Material* m_pMaterial` 成员与 `SetMaterial/GetMaterial`。
+- **Scene 增加材质管理**（Scene.h/.cpp）：`CreateMaterial<T>(name, args...)` 工厂 + `GetMaterial(name)` 查表（`std::map<std::string, Material*>`）；`~Scene()` 释放材质（重构后还释放光源/对象并 `clear`）。
+- **解析器拆分为 SceneLoader.cpp**：原 `Scene::LoadSceneFromXML` 及静态辅助函数（`ParseVector3f` / `GetChildText` / `GetChildFloat`）从 `Scene.cpp` 迁出到 `SceneLoader.cpp`；新增 `<Materials>` 解析分支（必须早于 `<SceneObjects>`）；`<SceneObject>` 子节点 `<Material>` 按名查表后 `SetMaterial`。
+- **Renderer::GetIrradiance 应用 BRDF**：从命中对象取材质，无材质 fallback `Color(INV_PI)`；渲染方程 `E += BRDF * L * max(cosθ, 0)`（Lambert 与方向无关，wo/wi 暂传同值）。
+- **新增 scene04.xml**：康奈尔盒 + 3 个 Lambert 材质（M_Lambert_Red/Gray/Blue，Blue 暂未挂载）+ scene03 灯光（PointLight 启用）。
+- **main 切到 scene04**（main.cpp）。
+- **技能文档**：新增 `references/material.md`；SKILL.md 模块地图、scene.md、renderer-core.md、changelog.md 同步。
+
+## 2026-09-04（scene03 光源调参 + shadow_isect 独立化）
 - **GetIrradiance 阴影射线独立化**（Renderer.cpp）：shadow ray 改用独立 `Intersection shadow_isect`（不再复用 `isect`），`mint` 从 `1e-4` 提到 `1e-3` 增强自相交鲁棒性。
 
 ## 2026-09-04（直接光照：Renderer::GetIrradiance）

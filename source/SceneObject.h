@@ -2,6 +2,7 @@
 
 #include "Ray.h"
 #include "Primitive.h"
+#include "Material.h"
 #include <vector>
 #include <utility>
 
@@ -55,9 +56,15 @@ public:
     Matrix4x4 GetObjectToWorld() const { return mObjectToWorld; }
     Matrix4x4 GetWorldToObject() const { return mWorldToObject; }
 
+    // 材质（SceneObject 拥有引用，材质对象由 Scene 统一管理生命周期）
+    void SetMaterial(Material* pMaterial) { m_pMaterial = pMaterial; }
+    Material* GetMaterial() const { return m_pMaterial; }
+
 private:
     Matrix4x4 mObjectToWorld; // 对象空间 → 世界空间 的变换矩阵
     Matrix4x4 mWorldToObject; // 世界空间 → 对象空间 的逆变换矩阵
+
+    Material* m_pMaterial = nullptr; // 本场景对象使用的材质
 
     std::vector<Primitive*> mPrimitives; // 本场景对象包含的所有基本图元
 };

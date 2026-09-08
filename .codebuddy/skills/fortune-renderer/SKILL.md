@@ -16,7 +16,9 @@ description: FortuneRenderer 软件光栅化/光线追踪渲染器项目的模�
 | 相机与射线 | `source/Camera.h/.cpp`、`source/Ray.h` | [references/camera.md](references/camera.md) |
 | 几何求交 | `source/Primitive.h`（抽象基类）、`source/SceneObject.h`（变换容器）、`source/Sphere.h/.cpp`、`source/Disk.h/.cpp`、`source/Triangle.h/.cpp` | [references/geometry-primitive.md](references/geometry-primitive.md)、[references/geometry-sphere.md](references/geometry-sphere.md)、[references/geometry-disk.md](references/geometry-disk.md)、[references/geometry-triangle.md](references/geometry-triangle.md) |
 | 场景 | `source/Scene.h/.cpp` | [references/scene.md](references/scene.md) |
+| 场景加载 | `source/SceneLoader.cpp`（`Scene::LoadSceneFromXML` 实现） | [references/scene.md](references/scene.md) |
 | 光源 | `source/Light.h/.cpp`（Light/DirectionalLight/PointLight/SpotLight） | [references/light.md](references/light.md) |
+| 材质 | `source/Material.h`（Material/LambertMaterial） | [references/material.md](references/material.md) |
 | 程序入口 | `source/main.cpp` | 见 renderer-core.md |
 
 ## 使用流程
