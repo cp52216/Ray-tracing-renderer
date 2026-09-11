@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
+#include <random>
 
 using Vector2f = glm::vec2;
 using Vector3f = glm::vec3;
@@ -113,4 +114,30 @@ inline Matrix3x3 MakeCoordinateSystem(const Vector3f& w)
     v = glm::normalize(v);
 
     return Matrix3x3(u, v, w); //列主序
+}
+
+// 路径追踪用：生成 [0, 1) 上的均匀随机数（线程安全，thread_local 避免竞态）
+inline float Random01()
+{
+    thread_local std::mt19937 gen(std::random_device{}());
+    thread_local std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    return dist(gen);
+}
+
+// 路径追踪用：在 [a, b) 区间内的均匀随机数
+inline float Random(float a, float b)
+{
+    return a + (b - a) * Random01();
+}
+
+// 球面坐标 → 单位向量
+//   theta ：从 +Z 轴（局部法线）往下的极角，范围 [0, π]
+//   phi   ：绕 +Z 轴的方位角，范围 [0, 2π)
+// 约定 z = cos(theta)，即 theta=0 → +Z，theta=π/2 → 水平面
+inline Vector3f GetSphericalCoordinate(float theta, float phi)
+{
+    return Vector3f(
+        sinf(theta) * cosf(phi),
+        sinf(theta) * sinf(phi),
+        cosf(theta));
 }

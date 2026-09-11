@@ -13,17 +13,17 @@
         <Material>
             <Name>M_Lambert_Red</Name>
             <Type>Lambert</Type>
-            <Albedo>0.6, 0.2, 0.2</Albedo>
+            <Albedo>1.0, 0.3, 0.3</Albedo>
         </Material>
         <Material>
             <Name>M_Lambert_Blue</Name>
             <Type>Lambert</Type>
-            <Albedo>0.2, 0.2, 0.8</Albedo>
+            <Albedo>0.3, 0.3, 1.0</Albedo>
         </Material>
         <Material>
             <Name>M_Lambert_Gray</Name>
             <Type>Lambert</Type>
-            <Albedo>0.5, 0.5, 0.5</Albedo>
+            <Albedo>0.8, 0.8, 0.8</Albedo>
         </Material>
     </Materials>
 
@@ -179,18 +179,18 @@
         <!-- 点光源：盒子内部中央稍上方，距离二次衰减 (A=1, B=0, C=0) -->
         <PointLight>
             <Position>0, 1, 0</Position>
-            <Intensity>2, 1, 1</Intensity>
+            <Intensity>1, 1, 1</Intensity>
             <Attenuations>1, 0, 0</Attenuations> <!-- A, B, C -->
         </PointLight>
 
-        <!-- 聚光灯：左侧高处朝右下斜射，内角 10°、外角 60° —— 已屏蔽 -->
-        <!--<SpotLight>
-            <Position>-0.8, 0.9, 0</Position>
-            <Direction>2, -1, 0</Direction>
-            <Intensity>1, 1, 1</Intensity>
+        <!-- 聚光灯：左前高处朝右后下方斜射，内角 10°、外角 60° -->
+        <SpotLight>
+            <Position>-0.8, 1.2, -1.0</Position>
+            <Direction>2, -1.5, 1.5</Direction>
+            <Intensity>2, 2, 2</Intensity>
             <InnerAngle>10</InnerAngle>
             <OuterAngle>60</OuterAngle>
-            <Attenuations>1, 0, 0</Attenuations>
-        </SpotLight>-->
+            <Attenuations>1, 0, 0</Attenuations> <!-- A, B, C -->
+        </SpotLight>
     </Lights>
 </Scene>

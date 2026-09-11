@@ -2,6 +2,32 @@
 
 > 每次为项目新增/修改功能后，在顶部按日期追加一条记录。
 
+## 2026-09-10（SPP=1000 渲染加速）
+
+- **build.bat 改为 Release 编译**：配置后追加 `cmake --build build --config Release --parallel`，产物在 `build/Release/FortuneRenderer.exe`。Release 用 /O2（Debug 是 /Od + /RTC1 检查），快 10~30 倍且不影响数值结果。
+- **Triangle 顶点/法线预变换缓存**（Triangle.h/.cpp）：SceneObject 构造后不变，构造函数里把三顶点经 GetObjectToWorld 变到世界空间缓存（`mWorldVertices[3]`）、法线叉积归一化缓存（`mWorldNormal`）；`Intersect` 直接用缓存，每条光线省 3 次矩阵乘法。求交结果不变（纯性能优化）。
+
+## 2026-09-10（对照教学版 Chapter09 修复渲染效果）
+
+- **SPP 2 → 1000**（main.cpp）：路径追踪噪声靠采样数收敛，SPP=2 方差极大导致画面噪点/闪烁；教学版用 1000。
+- **scene04.xml 对齐教学版 scene09**：
+  - albedo：红墙 `0.6,0.2,0.2→1.0,0.3,0.3`、蓝墙 `0.2,0.2,0.8→0.3,0.3,1.0`、灰 `0.5→0.8`（原先整体偏暗）；
+  - 点光 `Intensity` `2,1,1→1,1,1`（原偏红，导致画面整体染红）；
+  - 启用聚光灯并对齐参数：Position `(-0.8, 1.2, -1.0)`、Direction `(2, -1.5, 1.5)`、Intensity `2`、Inner/Outer `10°/60°`（与教学版一致的暖光斑与互补色渗色）。
+- 不加俄罗斯轮盘（用户要求）；教学版另有 `IsSpecular()` 分支与 `mMinDepth`，对全 Lambert 场景无视觉影响，暂不引入。
+
+## 2026-09-10（路径追踪：随机工具 + GetRadiance 递归 + 间接光照）
+
+- **Common.h 新增三个工具**：`Random01()` 线程安全 [0,1) 均匀随机数（`thread_local std::mt19937` + `uniform_real_distribution`）；`Random(a, b)` 区间均匀；`GetSphericalCoordinate(theta, phi)` 球面坐标→单位向量（z=cosθ）。加入 `<random>` 头。
+- **Renderer.h 路径追踪改造**：构造函数加 `maxDepth` 参数（签名 `Renderer(int w, int h, int maxDepth, int samplePerPixel, const char* filepath)`）；新增成员 `int mMaxDepth = 10`；`Color GetRadiance(const Ray& ray)` → `Color GetRadiance(const Ray& ray, int depth)`。
+- **Renderer::GetRadiance 路径追踪实现**：
+  - 早退：`depth > mMaxDepth` 返回黑色；
+  - 直接光照（同前，BRDF × L × cosθ，带 shadow ray）；
+  - 间接光照：蒙特卡洛半球积分，`N = 1`（**N=1 即"路径追踪"**：每层只采 1 条随机路径，噪声靠外层 SSAA 的 SPP 消除）——`theta ∈ [0, π/2]`, `phi ∈ [0, 2π)` 随机采 wi，递归 `GetRadiance(r, depth+1)` 取 Li，直接 `Lo += BRDF * Li * cosθ * sinθ * π²`（每次循环都把 π² 乘进 Li 里，不做末尾除以 N）；
+  - `RenderSubPixel` 改为 `GetRadiance(ray, 0)`。
+- **main.cpp 改用 maxDepth=10**：`Renderer renderer(800, 600, 10, 2, "../scenes/scene04.xml");`。
+- **技能文档**：`common-math.md` 加入路径追踪工具函数；`renderer-core.md` 描述 GetRadiance 含路径追踪分支；changelog 记录。
+
 ## 2026-09-08（恢复 GetIrradiance 与 GetRadiance 并存）
 
 - **恢复 `Color GetIrradiance(const Ray& ray)`**（Renderer.h/.cpp，从 git be223b2 找回实现）：求交 + shadow ray + `E = Σ L * max(cosθ, 0)`，**不乘 BRDF**，返回"到达该点的入射辐照度"；与 `GetRadiance`（乘 BRDF 的出射辐射 Lo）并存。`RenderSubPixel` 仍调 GetRadiance，GetIrradiance 保留作调试/对比（想看纯光照分布不带材质颜色时把调用切过去即可）。

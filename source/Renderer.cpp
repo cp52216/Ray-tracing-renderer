@@ -7,10 +7,11 @@
 #include <chrono>
 #include <glm/gtc/random.hpp>
 
-Renderer::Renderer(int w, int h, int samplePerPixel, const char* filepath)
+Renderer::Renderer(int w, int h, int maxDepth, int samplePerPixel, const char* filepath)
     : mViewportWidth(w)
     , mViewportHeight(h)
     , SamplePerPixel(samplePerPixel)
+    , mMaxDepth(maxDepth)
 {
     mCurrentPixelIndex.store(0);
 
@@ -172,17 +173,23 @@ Color Renderer::RenderPixel(int x, int y)
 Color Renderer::RenderSubPixel(float x, float y)
 {
     Ray ray = mScene->GetCamera().GetRay(x, y); // 世界空间射线
-    Color color = GetRadiance(ray);
+    Color color = GetRadiance(ray, 0);          // 路径追踪从 depth=0 开始
     return color;
 }
 
-// 给定一条世界空间光线，求它沿出射方向返回的辐射 Lo（渲染方程）：
+// 给定一条世界空间光线，递归地求它沿出射方向返回的辐射 Lo（路径追踪）：
 //   1) 与场景求最近交点；未命中 → 背景黑色
-//   2) 命中后在命中点处建立局部坐标系（z 轴 = 法线），把 wo/wi 转到局部坐标系后
-//      调材质的 BRDF，按 Lo = Σ BRDF * L_i * max(cosθ, 0) 累加
-//   3) 每盏灯先做 shadow ray 检测是否被遮挡，遮挡则 continue
-Color Renderer::GetRadiance(const Ray& ray)
+//   2) 命中后：
+//      a) 直接光照：遍历所有光源做带阴影的 BRDF 累加 Lo += Σ BRDF * L_i * max(cosθ, 0)
+//      b) 间接光照：蒙特卡洛半球积分，递归调用 GetRadiance 取 Li，乘 BRDF/cosθ，
+//         用 Lo += sum * π² / N 估计 ∫_Ω f_r · L_i · cosθ dω
+//   3) depth 超过 mMaxDepth 时直接返回黑色（防无限递归）
+Color Renderer::GetRadiance(const Ray& ray, int depth)
 {
+    // 递归深度上限：超过则停止追踪，假设被"吸收"
+    if (depth > mMaxDepth)
+        return Color(0, 0, 0);
+
     Intersection isect;
     SceneObject* pSceneObject = mScene->Intersect(ray, isect);
     if (pSceneObject == nullptr)
@@ -202,6 +209,7 @@ Color Renderer::GetRadiance(const Ray& ray)
     // 出射方向：相机射线的反方向，转换到局部坐标系
     Vector3f wo = worldToLocal * (-ray.d); // 出射方向，转换到局部坐标系
 
+    //直接光照
     for (Light* pLight : mScene->GetLights())
     {
         // 取光源在交点处的入射辐射 L，以及光源在世界中位置 sourcePos
@@ -229,6 +237,37 @@ Color Renderer::GetRadiance(const Ray& ray)
         // 调用材质 BRDF（在局部坐标系下评估）
         Color brdf = pMaterial->BRDF(wo, wi);
         Lo += brdf * L * glm::max(cosTheta, 0.0f);
+    }
+
+    // 间接光照:
+    {
+        // 蒙特卡洛积分：N = 1（每次只随机采 1 个方向）
+        //   当每层只采 1 条随机路径时，这种做法就叫"路径追踪（Path Tracing）"——
+        //   噪声由外层 SSAA 的多次采样（SamplePerPixel）来消除，而不是在这里多采。
+        //   （若 N > 1，此写法会漏除 N，需要把 π² 改成 π²/N 才是正确的均值估计）
+        // 沿交点法线所在的上半球随机采 wi，递归打一束 GetRadiance 取 Li，
+        // 直接把 f_r * Li * cosθ * sinθ * π² 累加到 Lo（π² 是所用采样方案下的 1/pdf 因子）
+        const int N = 1;
+        for (int i = 0; i < N; i++)
+        {
+            // 半球均匀采样：theta ∈ [0, π/2]，phi ∈ [0, 2π)
+            const float theta = Random(0.0f, PI * 0.5f);
+            const float phi   = Random(0.0f, 2 * PI);
+            Vector3f wi = GetSphericalCoordinate(theta, phi); // 局部坐标系下入射方向
+
+            // 评估材质 BRDF（局部系）
+            Color brdf = pMaterial->BRDF(wo, wi);
+
+            // 把局部 wi 反射回世界空间，从交点出发向 wi 方向投一条新光线
+            Ray r;
+            r.d    = localToWorld * wi;
+            r.o    = isect.position;
+            r.mint = 1e-3f; // 避免自相交
+
+            // 递归求该方向上的入射辐射
+            Color Li = GetRadiance(r, depth + 1);
+            Lo += brdf * Li * cosf(theta) * sinf(theta) * PI * PI;
+        }
     }
 
     return Lo;

@@ -34,6 +34,11 @@
 ### `MakeWorldTransform(position, euler, scale) -> Matrix4x4`
 `MakeWorld` 的便捷重载，`scale` 为 `float` 统一缩放因子，内部展开为 `Vector3f(scale)`。
 
+### 路径追踪用工具函数
+- `float Random01()`：线程安全的 `[0, 1)` 均匀随机数（`thread_local std::mt19937` + `uniform_real_distribution`）。
+- `float Random(float a, float b)`：`[a, b)` 内的均匀随机数。
+- `Vector3f GetSphericalCoordinate(theta, phi)`：球面坐标 → 单位向量，`z = cosθ`，适合蒙特卡洛半球采样。
+
 ### `MakeCoordinateSystem(const Vector3f& w) -> Matrix3x3`
 给定单位向量 w（新坐标系 Z 轴），用叉积构造与其正交的 u、v，返回 3x3 矩阵（三列即新坐标系的 X/Y/Z 轴基向量）。该矩阵把新坐标系下的局部坐标变换到世界坐标。w 若与 X 轴 `(1,0,0)`近平行（dot > 0.99）则改用 Y 轴辅助，避免退化。
 
